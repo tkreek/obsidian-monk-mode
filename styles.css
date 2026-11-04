@@ -95,36 +95,46 @@ body.monk-mode-active .workspace-leaf-content .markdown-reading-view .markdown-p
   padding-bottom: 50vh;
 }
 
-/* Footer: two faint buttons on the left, word count on the right. */
+/* Footer: a solid band along the bottom, about 2.5x as tall as its icons, so
+   a long note is cut off above it instead of running to the edge of the screen.
+   Two faint buttons on the left, word count on the right. */
+body {
+  --monk-footer-height: 64px;
+}
+
 .monk-footer {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
+  height: var(--monk-footer-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 14px;
+  padding: 0 14px;
+  background: var(--background-primary);
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
-  opacity: 0.45;
-  transition: opacity 150ms ease;
   z-index: var(--layer-status-bar, 15);
-  pointer-events: none;
 }
 
-.monk-footer:hover {
+.monk-footer-left,
+.monk-footer-words {
+  opacity: 0.45;
+  transition: opacity 150ms ease;
+}
+
+.monk-footer:hover .monk-footer-left,
+.monk-footer:hover .monk-footer-words {
   opacity: 1;
 }
 
 .monk-footer-left {
   display: flex;
   gap: 2px;
-  pointer-events: auto;
 }
 
 .monk-footer-words {
-  pointer-events: auto;
   font-variant-numeric: tabular-nums;
 }
 
