@@ -1,16 +1,58 @@
-/* Monk Mode */
-body.monk-mode-active.monk-hide-ribbon .workspace-ribbon.mod-left {
+/* ---------- Monk Mode ---------- */
+
+/* Ribbon */
+body.monk-mode-active.monk-hide-ribbon .workspace-ribbon {
   display: none;
 }
 
+/* Status bar */
 body.monk-mode-active.monk-hide-status-bar .status-bar {
   display: none;
 }
 
-body.monk-mode-active.monk-hide-tab-bar .workspace-tab-header-container {
+/* Tabs, title bar, window buttons and sidebar toggles */
+body.monk-mode-active.monk-hide-tab-bar .workspace-tab-header-container,
+body.monk-mode-active.monk-hide-tab-bar .titlebar,
+body.monk-mode-active.monk-hide-tab-bar .titlebar-button-container,
+body.monk-mode-active.monk-hide-tab-bar .sidebar-toggle-button {
   display: none;
 }
 
+/* Other panes in a split editor: show only the active tab group */
+body.monk-mode-active.monk-hide-other-panes .workspace-split.mod-root .workspace-tabs:not(.mod-active),
+body.monk-mode-active.monk-hide-other-panes .workspace-split.mod-root > hr.workspace-leaf-resize-handle,
+body.monk-mode-active.monk-hide-other-panes .workspace-split.mod-root .workspace-split > hr.workspace-leaf-resize-handle {
+  display: none;
+}
+
+/* Note header: hide breadcrumbs and buttons, keep a faint floating toggle */
+body.monk-mode-active.monk-hide-view-header .workspace-leaf-content .view-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: auto;
+  width: auto;
+  background: transparent;
+  border: none;
+  z-index: var(--layer-cover, 5);
+}
+
+body.monk-mode-active.monk-hide-view-header .view-header-left,
+body.monk-mode-active.monk-hide-view-header .view-header-title-container,
+body.monk-mode-active.monk-hide-view-header .view-actions > :not(.monk-mode-action) {
+  display: none;
+}
+
+body.monk-mode-active.monk-hide-view-header .monk-mode-action {
+  opacity: 0.25;
+  transition: opacity 150ms ease;
+}
+
+body.monk-mode-active.monk-hide-view-header .monk-mode-action:hover {
+  opacity: 1;
+}
+
+/* Active toggle */
 .monk-mode-action.is-active {
   color: var(--interactive-accent);
 }

@@ -1,20 +1,35 @@
 import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 
 interface MonkModeSettings {
+  collapseSidebars: boolean;
   hideRibbon: boolean;
   hideStatusBar: boolean;
   hideTabBar: boolean;
-  collapseSidebars: boolean;
+  hideOtherPanes: boolean;
+  hideViewHeader: boolean;
+  collapseProperties: boolean;
 }
 
 const DEFAULT_SETTINGS: MonkModeSettings = {
+  collapseSidebars: true,
   hideRibbon: true,
   hideStatusBar: true,
   hideTabBar: true,
-  collapseSidebars: true,
+  hideOtherPanes: true,
+  hideViewHeader: true,
+  collapseProperties: true,
 };
 
 const BODY_CLASS = "monk-mode-active";
+
+// Body classes toggled by individual settings while Monk Mode is on.
+const SETTING_CLASSES: Partial<Record<keyof MonkModeSettings, string>> = {
+  hideRibbon: "monk-hide-ribbon",
+  hideStatusBar: "monk-hide-status-bar",
+  hideTabBar: "monk-hide-tab-bar",
+  hideOtherPanes: "monk-hide-other-panes",
+  hideViewHeader: "monk-hide-view-header",
+};
 
 export default class MonkModePlugin extends Plugin {
   settings: MonkModeSettings = DEFAULT_SETTINGS;
@@ -22,13 +37,24 @@ export default class MonkModePlugin extends Plugin {
   private sidebarState = { left: false, right: false };
   private buttons = new Set<HTMLElement>();
   private viewsWithButton = new WeakSet<MarkdownView>();
+  // Properties panels we collapsed, so we can re-expand them on exit.
+  private collapsedByUs = new Set<HTMLElement>();
 
   async onload() {
     await this.loadSettings();
 
+    const { workspace } = this.app;
+
     // Toggle button in each note's header toolbar (next to the reading-view icon).
-    this.app.workspace.onLayoutReady(() => this.addHeaderButtons());
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.addHeaderButtons()));
+    workspace.onLayoutReady(() => this.addHeaderButtons());
+    this.registerEvent(workspace.on("layout-change", () => this.addHeaderButtons()));
+
+    // Keep properties collapsed as you move between notes while in Monk Mode.
+    const recollapse = () => {
+      if (this.active && this.settings.collapseProperties) this.collapsePropertiesSoon();
+    };
+    this.registerEvent(workspace.on("file-open", recollapse));
+    this.registerEvent(workspace.on("active-leaf-change", recollapse));
 
     this.addCommand({
       id: "toggle",
@@ -43,6 +69,71 @@ export default class MonkModePlugin extends Plugin {
     if (this.active) this.exit();
     this.buttons.forEach((el) => el.remove());
     this.buttons.clear();
+  }
+
+  toggle() {
+    this.active ? this.exit() : this.enter();
+  }
+
+  private enter() {
+    const { workspace } = this.app;
+    if (this.settings.collapseSidebars) {
+      this.sidebarState = {
+        left: !workspace.leftSplit.collapsed,
+        right: !workspace.rightSplit.collapsed,
+      };
+      workspace.leftSplit.collapse();
+      workspace.rightSplit.collapse();
+    }
+    this.active = true;
+    this.applyClasses();
+    if (this.settings.collapseProperties) this.collapsePropertiesSoon();
+    this.refreshButtons();
+  }
+
+  private exit() {
+    const { workspace } = this.app;
+    document.body.classList.remove(BODY_CLASS, ...Object.values(SETTING_CLASSES));
+    if (this.settings.collapseSidebars) {
+      if (this.sidebarState.left) workspace.leftSplit.expand();
+      if (this.sidebarState.right) workspace.rightSplit.expand();
+    }
+    this.restoreProperties();
+    this.active = false;
+    this.refreshButtons();
+  }
+
+  applyClasses() {
+    const cl = document.body.classList;
+    cl.add(BODY_CLASS);
+    for (const [key, cls] of Object.entries(SETTING_CLASSES)) {
+      cl.toggle(cls, Boolean(this.settings[key as keyof MonkModeSettings]));
+    }
+  }
+
+  // The properties panel renders a moment after a note opens, so wait a frame.
+  private collapsePropertiesSoon() {
+    window.setTimeout(() => this.collapseProperties(), 50);
+  }
+
+  private collapseProperties() {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) return;
+    view.containerEl.querySelectorAll<HTMLElement>(".metadata-container").forEach((container) => {
+      if (container.hasClass("is-collapsed")) return;
+      const heading = container.querySelector<HTMLElement>(".metadata-properties-heading");
+      if (!heading) return;
+      heading.click(); // use Obsidian's own toggle so its state stays consistent
+      this.collapsedByUs.add(container);
+    });
+  }
+
+  private restoreProperties() {
+    for (const container of this.collapsedByUs) {
+      if (!container.isConnected || !container.hasClass("is-collapsed")) continue;
+      container.querySelector<HTMLElement>(".metadata-properties-heading")?.click();
+    }
+    this.collapsedByUs.clear();
   }
 
   private addHeaderButtons() {
@@ -77,53 +168,6 @@ export default class MonkModePlugin extends Plugin {
     return this.active ? "Exit Monk Mode" : "Enter Monk Mode";
   }
 
-  toggle() {
-    this.active ? this.exit() : this.enter();
-  }
-
-  private enter() {
-    const { workspace } = this.app;
-    if (this.settings.collapseSidebars) {
-      this.sidebarState = {
-        left: !workspace.leftSplit.collapsed,
-        right: !workspace.rightSplit.collapsed,
-      };
-      workspace.leftSplit.collapse();
-      workspace.rightSplit.collapse();
-    }
-    this.applyClasses();
-    this.active = true;
-    this.refreshButtons();
-  }
-
-  private exit() {
-    const { workspace } = this.app;
-    document.body.classList.remove(
-      BODY_CLASS,
-      "monk-hide-ribbon",
-      "monk-hide-status-bar",
-      "monk-hide-tab-bar"
-    );
-    if (this.settings.collapseSidebars) {
-      if (this.sidebarState.left) workspace.leftSplit.expand();
-      if (this.sidebarState.right) workspace.rightSplit.expand();
-    }
-    this.active = false;
-    this.refreshButtons();
-  }
-
-  applyClasses() {
-    const cl = document.body.classList;
-    cl.add(BODY_CLASS);
-    cl.toggle("monk-hide-ribbon", this.settings.hideRibbon);
-    cl.toggle("monk-hide-status-bar", this.settings.hideStatusBar);
-    cl.toggle("monk-hide-tab-bar", this.settings.hideTabBar);
-  }
-
-  get isActive() {
-    return this.active;
-  }
-
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
@@ -154,9 +198,12 @@ class MonkModeSettingTab extends PluginSettingTab {
           })
         );
 
-    toggle("Collapse sidebars", "Collapse left and right sidebars when entering Monk Mode.", "collapseSidebars");
+    toggle("Collapse sidebars", "Collapse the left and right sidebars.", "collapseSidebars");
     toggle("Hide ribbon", "Hide the left ribbon.", "hideRibbon");
+    toggle("Hide tab bar", "Hide the tabs and title bar.", "hideTabBar");
+    toggle("Hide other panes", "Show only the active pane when the editor is split.", "hideOtherPanes");
+    toggle("Hide note header", "Hide the breadcrumbs and header buttons, leaving only a faint Monk Mode toggle.", "hideViewHeader");
     toggle("Hide status bar", "Hide the bottom status bar.", "hideStatusBar");
-    toggle("Hide tab bar", "Hide the tab header strip.", "hideTabBar");
+    toggle("Collapse properties", "Fold the properties panel of each note you open.", "collapseProperties");
   }
 }
