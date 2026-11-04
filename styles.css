@@ -56,3 +56,11 @@ body.monk-mode-active.monk-hide-view-header .monk-mode-action:hover {
 .monk-mode-action.is-active {
   color: var(--interactive-accent);
 }
+
+/* Negative space: push the note down toward the middle of the screen, and
+   allow scrolling the last line up to the middle so writing stays centered. */
+body.monk-mode-active .workspace-leaf-content .markdown-source-view.mod-cm6 .cm-scroller,
+body.monk-mode-active .workspace-leaf-content .markdown-reading-view .markdown-preview-view {
+  padding-top: var(--monk-top-space, 30vh);
+  padding-bottom: 50vh;
+}

@@ -8,6 +8,7 @@ interface MonkModeSettings {
   hideOtherPanes: boolean;
   hideViewHeader: boolean;
   collapseProperties: boolean;
+  topSpace: number; // empty space above the note, in % of window height
 }
 
 const DEFAULT_SETTINGS: MonkModeSettings = {
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: MonkModeSettings = {
   hideOtherPanes: true,
   hideViewHeader: true,
   collapseProperties: true,
+  topSpace: 30,
 };
 
 const BODY_CLASS = "monk-mode-active";
@@ -94,6 +96,7 @@ export default class MonkModePlugin extends Plugin {
   private exit() {
     const { workspace } = this.app;
     document.body.classList.remove(BODY_CLASS, ...Object.values(SETTING_CLASSES));
+    document.body.style.removeProperty("--monk-top-space");
     if (this.settings.collapseSidebars) {
       if (this.sidebarState.left) workspace.leftSplit.expand();
       if (this.sidebarState.right) workspace.rightSplit.expand();
@@ -109,6 +112,7 @@ export default class MonkModePlugin extends Plugin {
     for (const [key, cls] of Object.entries(SETTING_CLASSES)) {
       cl.toggle(cls, Boolean(this.settings[key as keyof MonkModeSettings]));
     }
+    document.body.style.setProperty("--monk-top-space", `${this.settings.topSpace}vh`);
   }
 
   // The properties panel renders a moment after a note opens, so wait a frame.
@@ -187,7 +191,8 @@ class MonkModeSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    const toggle = (name: string, desc: string, key: keyof MonkModeSettings) =>
+    type BoolKey = { [K in keyof MonkModeSettings]: MonkModeSettings[K] extends boolean ? K : never }[keyof MonkModeSettings];
+    const toggle = (name: string, desc: string, key: BoolKey) =>
       new Setting(containerEl)
         .setName(name)
         .setDesc(desc)
@@ -205,5 +210,19 @@ class MonkModeSettingTab extends PluginSettingTab {
     toggle("Hide note header", "Hide the breadcrumbs and header buttons, leaving only a faint Monk Mode toggle.", "hideViewHeader");
     toggle("Hide status bar", "Hide the bottom status bar.", "hideStatusBar");
     toggle("Collapse properties", "Fold the properties panel of each note you open.", "collapseProperties");
+
+    new Setting(containerEl)
+      .setName("Space above note")
+      .setDesc("Empty space above the note, as a percentage of the window height. Around 30–40% puts the start of the note near the middle of the screen.")
+      .addSlider((s) =>
+        s
+          .setLimits(0, 50, 5)
+          .setValue(this.plugin.settings.topSpace)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.topSpace = v;
+            await this.plugin.saveSettings();
+          })
+      );
   }
 }
