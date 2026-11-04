@@ -1,4 +1,5 @@
 import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { TypewriterSounds } from "./sounds";
 
 interface MonkModeSettings {
   collapseSidebars: boolean;
@@ -8,6 +9,8 @@ interface MonkModeSettings {
   hideOtherPanes: boolean;
   hideViewHeader: boolean;
   collapseProperties: boolean;
+  showFooter: boolean;
+  typewriterSounds: boolean;
   topSpace: number; // empty space above the note, in % of window height
 }
 
@@ -19,6 +22,8 @@ const DEFAULT_SETTINGS: MonkModeSettings = {
   hideOtherPanes: true,
   hideViewHeader: true,
   collapseProperties: true,
+  showFooter: true,
+  typewriterSounds: false,
   topSpace: 30,
 };
 
@@ -39,8 +44,16 @@ export default class MonkModePlugin extends Plugin {
   private sidebarState = { left: false, right: false };
   private buttons = new Set<HTMLElement>();
   private viewsWithButton = new WeakSet<MarkdownView>();
-  // Properties panels we collapsed, so we can re-expand them on exit.
-  private collapsedByUs = new Set<HTMLElement>();
+  // Properties panels we folded or unfolded, so we can put them back on exit.
+  private changedByUs = new Map<HTMLElement, boolean>(); // container -> was collapsed
+  private propertiesOpen = false;
+
+  private sounds = new TypewriterSounds();
+  private footerEl: HTMLElement | null = null;
+  private wordCountEl: HTMLElement | null = null;
+  private propertiesButton: HTMLElement | null = null;
+  private soundButton: HTMLElement | null = null;
+  private wordCountTimer: number | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -51,19 +64,55 @@ export default class MonkModePlugin extends Plugin {
     workspace.onLayoutReady(() => this.addHeaderButtons());
     this.registerEvent(workspace.on("layout-change", () => this.addHeaderButtons()));
 
-    // As you move between notes in Monk Mode: keep properties folded and put
-    // the cursor in the body of the note.
-    this.registerEvent(workspace.on("file-open", () => {
-      if (this.active) this.settleSoon(true);
-    }));
-    this.registerEvent(workspace.on("active-leaf-change", () => {
-      if (this.active) this.settleSoon(false);
-    }));
+    // As you move between notes in Monk Mode: keep properties as chosen, put
+    // the cursor in the body of the note and update the word count.
+    this.registerEvent(
+      workspace.on("file-open", () => {
+        if (this.active) this.settleSoon(true);
+      })
+    );
+    this.registerEvent(
+      workspace.on("active-leaf-change", () => {
+        if (this.active) this.settleSoon(false);
+      })
+    );
+    this.registerEvent(
+      workspace.on("editor-change", () => {
+        if (this.active) this.updateWordCountSoon();
+      })
+    );
+
+    // Typewriter sounds: only for keys typed into the note editor.
+    this.registerDomEvent(
+      document,
+      "keydown",
+      (event) => {
+        if (!this.active || !this.settings.typewriterSounds) return;
+        const target = event.target as HTMLElement | null;
+        if (!target?.closest(".cm-editor")) return;
+        this.sounds.handleKey(event);
+      },
+      { capture: true }
+    );
 
     this.addCommand({
       id: "toggle",
       name: "Toggle Monk Mode",
       callback: () => this.toggle(),
+    });
+    this.addCommand({
+      id: "toggle-typewriter-sounds",
+      name: "Toggle typewriter sounds",
+      callback: () => this.toggleSounds(),
+    });
+    this.addCommand({
+      id: "toggle-properties",
+      name: "Show or hide properties",
+      checkCallback: (checking) => {
+        if (!this.active) return false;
+        if (!checking) this.toggleProperties();
+        return true;
+      },
     });
 
     this.addSettingTab(new MonkModeSettingTab(this.app, this));
@@ -73,6 +122,7 @@ export default class MonkModePlugin extends Plugin {
     if (this.active) this.exit();
     this.buttons.forEach((el) => el.remove());
     this.buttons.clear();
+    this.sounds.destroy();
   }
 
   toggle() {
@@ -90,7 +140,10 @@ export default class MonkModePlugin extends Plugin {
       workspace.rightSplit.collapse();
     }
     this.active = true;
+    this.propertiesOpen = !this.settings.collapseProperties;
     this.applyClasses();
+    this.renderFooter();
+    if (this.settings.typewriterSounds) this.sounds.warmUp();
     this.settleSoon(true);
     this.refreshButtons();
   }
@@ -104,6 +157,7 @@ export default class MonkModePlugin extends Plugin {
       if (this.sidebarState.right) workspace.rightSplit.expand();
     }
     this.restoreProperties();
+    this.removeFooter();
     this.active = false;
     this.refreshButtons();
   }
@@ -122,8 +176,9 @@ export default class MonkModePlugin extends Plugin {
   private settleSoon(focusBody: boolean) {
     window.setTimeout(() => {
       if (!this.active) return;
-      if (this.settings.collapseProperties) this.collapseProperties();
+      this.applyPropertiesState();
       if (focusBody) this.focusBody();
+      this.updateWordCount();
     }, 50);
   }
 
@@ -141,25 +196,108 @@ export default class MonkModePlugin extends Plugin {
     editor.focus();
   }
 
-  private collapseProperties() {
+  // ---------- Properties ----------
+
+  toggleProperties() {
+    this.propertiesOpen = !this.propertiesOpen;
+    this.applyPropertiesState();
+    this.refreshFooter();
+  }
+
+  private applyPropertiesState() {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view) return;
     view.containerEl.querySelectorAll<HTMLElement>(".metadata-container").forEach((container) => {
-      if (container.hasClass("is-collapsed")) return;
+      const collapsed = container.hasClass("is-collapsed");
+      if (collapsed === !this.propertiesOpen) return;
       const heading = container.querySelector<HTMLElement>(".metadata-properties-heading");
       if (!heading) return;
+      if (!this.changedByUs.has(container)) this.changedByUs.set(container, collapsed);
       heading.click(); // use Obsidian's own toggle so its state stays consistent
-      this.collapsedByUs.add(container);
     });
   }
 
   private restoreProperties() {
-    for (const container of this.collapsedByUs) {
-      if (!container.isConnected || !container.hasClass("is-collapsed")) continue;
+    for (const [container, wasCollapsed] of this.changedByUs) {
+      if (!container.isConnected || container.hasClass("is-collapsed") === wasCollapsed) continue;
       container.querySelector<HTMLElement>(".metadata-properties-heading")?.click();
     }
-    this.collapsedByUs.clear();
+    this.changedByUs.clear();
   }
+
+  // ---------- Typewriter sounds ----------
+
+  async toggleSounds() {
+    this.settings.typewriterSounds = !this.settings.typewriterSounds;
+    if (this.settings.typewriterSounds) this.sounds.warmUp();
+    await this.saveData(this.settings);
+    this.refreshFooter();
+  }
+
+  // ---------- Footer ----------
+
+  private renderFooter() {
+    this.removeFooter();
+    if (!this.settings.showFooter) return;
+
+    const footer = document.body.createDiv({ cls: "monk-footer" });
+    const left = footer.createDiv({ cls: "monk-footer-left" });
+
+    this.propertiesButton = left.createDiv({ cls: "clickable-icon monk-footer-button" });
+    this.propertiesButton.addEventListener("click", () => this.toggleProperties());
+
+    this.soundButton = left.createDiv({ cls: "clickable-icon monk-footer-button" });
+    this.soundButton.addEventListener("click", () => void this.toggleSounds());
+
+    this.wordCountEl = footer.createDiv({ cls: "monk-footer-words" });
+
+    // Keep the cursor in the note when clicking the footer buttons.
+    footer.addEventListener("mousedown", (e) => e.preventDefault());
+
+    this.footerEl = footer;
+    this.refreshFooter();
+    this.updateWordCount();
+  }
+
+  private removeFooter() {
+    this.footerEl?.remove();
+    this.footerEl = this.wordCountEl = this.propertiesButton = this.soundButton = null;
+  }
+
+  private refreshFooter() {
+    if (this.propertiesButton) {
+      setIcon(this.propertiesButton, "list");
+      this.propertiesButton.setAttr("aria-label", this.propertiesOpen ? "Hide properties" : "Show properties");
+      this.propertiesButton.toggleClass("is-active", this.propertiesOpen);
+    }
+    if (this.soundButton) {
+      const on = this.settings.typewriterSounds;
+      setIcon(this.soundButton, on ? "volume-2" : "volume-x");
+      this.soundButton.setAttr("aria-label", on ? "Turn typewriter sounds off" : "Turn typewriter sounds on");
+      this.soundButton.toggleClass("is-active", on);
+    }
+  }
+
+  private updateWordCountSoon() {
+    if (this.wordCountTimer !== null) window.clearTimeout(this.wordCountTimer);
+    this.wordCountTimer = window.setTimeout(() => {
+      this.wordCountTimer = null;
+      this.updateWordCount();
+    }, 200);
+  }
+
+  private updateWordCount() {
+    if (!this.wordCountEl) return;
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) {
+      this.wordCountEl.setText("");
+      return;
+    }
+    const n = countWords(view.editor.getValue());
+    this.wordCountEl.setText(`${n.toLocaleString()} ${n === 1 ? "word" : "words"}`);
+  }
+
+  // ---------- Header button ----------
 
   private addHeaderButtons() {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
@@ -193,14 +331,25 @@ export default class MonkModePlugin extends Plugin {
     return this.active ? "Exit Monk Mode" : "Enter Monk Mode";
   }
 
+  // ---------- Settings ----------
+
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
-    if (this.active) this.applyClasses();
+    if (this.active) {
+      this.applyClasses();
+      this.renderFooter();
+    }
   }
+}
+
+/** Count words in a note, leaving out the properties (frontmatter). */
+function countWords(text: string): number {
+  const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---(\r?\n|$)/, "");
+  return body.match(/[\p{L}\p{N}]+(?:['’\-_][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 }
 
 class MonkModeSettingTab extends PluginSettingTab {
@@ -212,7 +361,9 @@ class MonkModeSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    type BoolKey = { [K in keyof MonkModeSettings]: MonkModeSettings[K] extends boolean ? K : never }[keyof MonkModeSettings];
+    type BoolKey = {
+      [K in keyof MonkModeSettings]: MonkModeSettings[K] extends boolean ? K : never;
+    }[keyof MonkModeSettings];
     const toggle = (name: string, desc: string, key: BoolKey) =>
       new Setting(containerEl)
         .setName(name)
@@ -228,13 +379,25 @@ class MonkModeSettingTab extends PluginSettingTab {
     toggle("Hide ribbon", "Hide the left ribbon.", "hideRibbon");
     toggle("Hide tab bar", "Hide the tabs and title bar.", "hideTabBar");
     toggle("Hide other panes", "Show only the active pane when the editor is split.", "hideOtherPanes");
-    toggle("Hide note header", "Replace the header and big title with a small, faded note name at the top and a faint Monk Mode toggle.", "hideViewHeader");
+    toggle(
+      "Hide note header",
+      "Replace the header and big title with a small, faded note name at the top and a faint Monk Mode toggle.",
+      "hideViewHeader"
+    );
     toggle("Hide status bar", "Hide the bottom status bar.", "hideStatusBar");
-    toggle("Collapse properties", "Fold the properties panel of each note you open.", "collapseProperties");
+    toggle("Collapse properties", "Start with the properties panel folded.", "collapseProperties");
+    toggle(
+      "Show footer",
+      "Show the word count and the properties and typewriter-sound buttons along the bottom.",
+      "showFooter"
+    );
+    toggle("Typewriter sounds", "Play IBM Selectric II sounds as you type in Monk Mode.", "typewriterSounds");
 
     new Setting(containerEl)
       .setName("Space above note")
-      .setDesc("Empty space above the note, as a percentage of the window height. Around 30–40% puts the start of the note near the middle of the screen.")
+      .setDesc(
+        "Empty space above the note, as a percentage of the window height. Around 30–40% puts the start of the note near the middle of the screen."
+      )
       .addSlider((s) =>
         s
           .setLimits(0, 50, 5)

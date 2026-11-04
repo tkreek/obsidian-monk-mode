@@ -7,6 +7,8 @@ const prod = process.argv[2] === "production";
 const context = await esbuild.context({
   entryPoints: ["src/main.ts"],
   bundle: true,
+  // Bundle the typewriter sounds into main.js (plugins ship only main.js).
+  loader: { ".wav": "binary" },
   external: [
     "obsidian",
     "electron",

@@ -94,3 +94,40 @@ body.monk-mode-active .workspace-leaf-content .markdown-reading-view .markdown-p
   padding-top: var(--monk-top-space, 30vh);
   padding-bottom: 50vh;
 }
+
+/* Footer: two faint buttons on the left, word count on the right. */
+.monk-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  opacity: 0.45;
+  transition: opacity 150ms ease;
+  z-index: var(--layer-status-bar, 15);
+  pointer-events: none;
+}
+
+.monk-footer:hover {
+  opacity: 1;
+}
+
+.monk-footer-left {
+  display: flex;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.monk-footer-words {
+  pointer-events: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.monk-footer-button.is-active {
+  color: var(--text-muted);
+}
