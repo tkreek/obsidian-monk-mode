@@ -1,4 +1,4 @@
-import { App, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { addIcon, App, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 import { TypewriterSounds } from "./sounds";
 
 interface MonkModeSettings {
@@ -33,6 +33,21 @@ const DEFAULT_SETTINGS: MonkModeSettings = {
 
 const BODY_CLASS = "monk-mode-active";
 
+// Candle icons for the Monk Mode toggle: unlit when off, lit when on. Drawn
+// on Lucide's 24px grid and scaled to the 100px box Obsidian's addIcon uses,
+// with Obsidian's icon stroke width so they match the built-in icons.
+const CANDLE_BODY =
+  '<path d="M9 11h6v9a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/><path d="M12 11V8.5"/><path d="M6 21h12"/>';
+const CANDLE_FLAME = '<path d="M12 2c1.4 1.7 2.3 3 2.3 4.2a2.3 2.3 0 0 1-4.6 0C9.7 5 10.6 3.7 12 2z"/>';
+const candleSvg = (lit: boolean) =>
+  '<g transform="scale(4.1667)" fill="none" stroke="currentColor" stroke-linecap="round" ' +
+  'stroke-linejoin="round" style="stroke-width: var(--icon-stroke, 2)">' +
+  CANDLE_BODY +
+  (lit ? CANDLE_FLAME : "") +
+  "</g>";
+const ICON_CANDLE_LIT = "monk-candle-lit";
+const ICON_CANDLE_UNLIT = "monk-candle-unlit";
+
 // Body classes toggled by individual settings while Monk Mode is on.
 const SETTING_CLASSES: Partial<Record<keyof MonkModeSettings, string>> = {
   hideRibbon: "monk-hide-ribbon",
@@ -65,6 +80,9 @@ export default class MonkModePlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+
+    addIcon(ICON_CANDLE_LIT, candleSvg(true));
+    addIcon(ICON_CANDLE_UNLIT, candleSvg(false));
 
     const { workspace } = this.app;
 
@@ -400,7 +418,7 @@ export default class MonkModePlugin extends Plugin {
   }
 
   private buttonIcon() {
-    return this.active ? "eye" : "eye-off";
+    return this.active ? ICON_CANDLE_LIT : ICON_CANDLE_UNLIT;
   }
 
   private buttonLabel() {
