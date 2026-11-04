@@ -97,7 +97,7 @@ body.monk-mode-active .workspace-leaf-content .markdown-reading-view .markdown-p
 
 /* Footer: a solid band along the bottom, about 2.5x as tall as its icons, so
    a long note is cut off above it instead of running to the edge of the screen.
-   Two faint buttons on the left, word count on the right. */
+   Two faint buttons bottom-left, word count bottom-right. */
 body {
   --monk-footer-height: 64px;
 }
@@ -109,9 +109,9 @@ body {
   bottom: 0;
   height: var(--monk-footer-height);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  padding: 0 14px;
+  padding: 0 14px 6px;
   background: var(--background-primary);
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
@@ -136,6 +136,9 @@ body {
 
 .monk-footer-words {
   font-variant-numeric: tabular-nums;
+  /* Line the text up with the middle of the icons beside it. */
+  line-height: var(--icon-size, 18px);
+  padding: var(--size-2-2, 4px) 0;
 }
 
 .monk-footer-button.is-active {
