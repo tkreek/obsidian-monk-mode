@@ -143,6 +143,7 @@ export default class MonkModePlugin extends Plugin {
     this.propertiesOpen = !this.settings.collapseProperties;
     this.applyClasses();
     this.renderFooter();
+    this.applyPropertiesState();
     if (this.settings.typewriterSounds) this.sounds.warmUp();
     this.settleSoon(true);
     this.refreshButtons();
@@ -156,6 +157,7 @@ export default class MonkModePlugin extends Plugin {
       if (this.sidebarState.left) workspace.leftSplit.expand();
       if (this.sidebarState.right) workspace.rightSplit.expand();
     }
+    document.body.classList.remove("monk-hide-properties");
     this.restoreProperties();
     this.removeFooter();
     this.active = false;
@@ -204,12 +206,16 @@ export default class MonkModePlugin extends Plugin {
     this.refreshFooter();
   }
 
+  // Off: the properties panel is hidden completely (CSS, via a body class).
+  // On: it is shown and unfolded.
   private applyPropertiesState() {
+    document.body.classList.toggle("monk-hide-properties", !this.propertiesOpen);
+    if (!this.propertiesOpen) return;
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view) return;
     view.containerEl.querySelectorAll<HTMLElement>(".metadata-container").forEach((container) => {
       const collapsed = container.hasClass("is-collapsed");
-      if (collapsed === !this.propertiesOpen) return;
+      if (!collapsed) return;
       const heading = container.querySelector<HTMLElement>(".metadata-properties-heading");
       if (!heading) return;
       if (!this.changedByUs.has(container)) this.changedByUs.set(container, collapsed);
@@ -385,7 +391,7 @@ class MonkModeSettingTab extends PluginSettingTab {
       "hideViewHeader"
     );
     toggle("Hide status bar", "Hide the bottom status bar.", "hideStatusBar");
-    toggle("Collapse properties", "Start with the properties panel folded.", "collapseProperties");
+    toggle("Hide properties", "Start with the properties panel hidden. The footer button shows it again.", "collapseProperties");
     toggle(
       "Show footer",
       "Show the word count and the properties and typewriter-sound buttons along the bottom.",
