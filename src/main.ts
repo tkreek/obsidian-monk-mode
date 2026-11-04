@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 
 interface MonkModeSettings {
   hideRibbon: boolean;
@@ -20,11 +20,15 @@ export default class MonkModePlugin extends Plugin {
   settings: MonkModeSettings = DEFAULT_SETTINGS;
   private active = false;
   private sidebarState = { left: false, right: false };
+  private buttons = new Set<HTMLElement>();
+  private viewsWithButton = new WeakSet<MarkdownView>();
 
   async onload() {
     await this.loadSettings();
 
-    this.addRibbonIcon("eye-off", "Toggle Monk Mode", () => this.toggle());
+    // Toggle button in each note's header toolbar (next to the reading-view icon).
+    this.app.workspace.onLayoutReady(() => this.addHeaderButtons());
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.addHeaderButtons()));
 
     this.addCommand({
       id: "toggle",
@@ -37,6 +41,40 @@ export default class MonkModePlugin extends Plugin {
 
   onunload() {
     if (this.active) this.exit();
+    this.buttons.forEach((el) => el.remove());
+    this.buttons.clear();
+  }
+
+  private addHeaderButtons() {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView) || this.viewsWithButton.has(view)) continue;
+      const el = view.addAction(this.buttonIcon(), this.buttonLabel(), () => this.toggle());
+      el.addClass("monk-mode-action");
+      el.toggleClass("is-active", this.active);
+      this.viewsWithButton.add(view);
+      this.buttons.add(el);
+    }
+  }
+
+  private refreshButtons() {
+    for (const el of this.buttons) {
+      if (!el.isConnected) {
+        this.buttons.delete(el);
+        continue;
+      }
+      setIcon(el, this.buttonIcon());
+      el.setAttr("aria-label", this.buttonLabel());
+      el.toggleClass("is-active", this.active);
+    }
+  }
+
+  private buttonIcon() {
+    return this.active ? "eye" : "eye-off";
+  }
+
+  private buttonLabel() {
+    return this.active ? "Exit Monk Mode" : "Enter Monk Mode";
   }
 
   toggle() {
@@ -55,6 +93,7 @@ export default class MonkModePlugin extends Plugin {
     }
     this.applyClasses();
     this.active = true;
+    this.refreshButtons();
   }
 
   private exit() {
@@ -70,6 +109,7 @@ export default class MonkModePlugin extends Plugin {
       if (this.sidebarState.right) workspace.rightSplit.expand();
     }
     this.active = false;
+    this.refreshButtons();
   }
 
   applyClasses() {

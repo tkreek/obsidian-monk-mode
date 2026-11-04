@@ -10,3 +10,7 @@ body.monk-mode-active.monk-hide-status-bar .status-bar {
 body.monk-mode-active.monk-hide-tab-bar .workspace-tab-header-container {
   display: none;
 }
+
+.monk-mode-action.is-active {
+  color: var(--interactive-accent);
+}
