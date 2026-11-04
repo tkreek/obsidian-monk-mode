@@ -1,0 +1,12 @@
+/* Monk Mode */
+body.monk-mode-active.monk-hide-ribbon .workspace-ribbon.mod-left {
+  display: none;
+}
+
+body.monk-mode-active.monk-hide-status-bar .status-bar {
+  display: none;
+}
+
+body.monk-mode-active.monk-hide-tab-bar .workspace-tab-header-container {
+  display: none;
+}

@@ -1,0 +1,9 @@
+{
+  "id": "monk-mode",
+  "name": "Monk Mode",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "A distraction-free focus mode: hides sidebars, ribbon and status bar so only your note remains.",
+  "author": "Thomas Kreek",
+  "isDesktopOnly": false
+}
