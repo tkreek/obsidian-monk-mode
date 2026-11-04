@@ -91,7 +91,7 @@ body.monk-mode-active .metadata-container:focus-within {
    allow scrolling the last line up to the middle so writing stays centered. */
 body.monk-mode-active .workspace-leaf-content .markdown-source-view.mod-cm6 .cm-scroller,
 body.monk-mode-active .workspace-leaf-content .markdown-reading-view .markdown-preview-view {
-  padding-top: var(--monk-top-space, 25vh);
+  padding-top: var(--monk-top-space, 20vh);
   padding-bottom: 50vh;
 }
 

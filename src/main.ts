@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: MonkModeSettings = {
   collapseProperties: true,
   showFooter: true,
   typewriterSounds: false,
-  topSpace: 25,
+  topSpace: 20,
 };
 
 const BODY_CLASS = "monk-mode-active";
