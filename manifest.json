@@ -1,9 +1,10 @@
 {
   "id": "monk-mode",
   "name": "Monk Mode",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "minAppVersion": "1.5.0",
-  "description": "A distraction-free focus mode: hides sidebars, ribbon and status bar so only your note remains.",
+  "description": "Distraction-free writing. Hides everything but the note you're on, with a quiet footer for word count, typewriter sounds and a no-deleting Hemingway mode.",
   "author": "Thomas Kreek",
+  "authorUrl": "https://github.com/tkreek",
   "isDesktopOnly": false
 }

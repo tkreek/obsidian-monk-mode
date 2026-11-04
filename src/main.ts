@@ -138,7 +138,7 @@ export default class MonkModePlugin extends Plugin {
 
     this.addCommand({
       id: "toggle",
-      name: "Toggle Monk Mode",
+      name: "Toggle",
       callback: () => this.toggle(),
     });
     this.addCommand({
