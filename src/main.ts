@@ -1,4 +1,4 @@
-import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { App, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 import { TypewriterSounds } from "./sounds";
 
 interface MonkModeSettings {
@@ -11,6 +11,8 @@ interface MonkModeSettings {
   collapseProperties: boolean;
   showFooter: boolean;
   typewriterSounds: boolean; // start each Monk Mode session with sounds on
+  volume: number; // typewriter sound volume, 0–100
+  hemingwayMode: boolean; // no deleting in Monk Mode
   topSpace: number; // empty space above the note, in % of window height
 }
 
@@ -24,6 +26,8 @@ const DEFAULT_SETTINGS: MonkModeSettings = {
   collapseProperties: true,
   showFooter: true,
   typewriterSounds: false,
+  volume: 35,
+  hemingwayMode: false,
   topSpace: 10,
 };
 
@@ -85,15 +89,47 @@ export default class MonkModePlugin extends Plugin {
       })
     );
 
-    // Typewriter sounds: only for keys typed into the note editor.
+    // Keys typed into the note editor: Hemingway mode first (it may swallow the
+    // key), then typewriter sounds.
+    const inEditor = (event: Event) =>
+      this.active && Boolean((event.target as HTMLElement | null)?.closest?.(".cm-editor"));
+    const hemingway = () => this.active && this.settings.hemingwayMode;
+
     this.registerDomEvent(
       document,
       "keydown",
       (event) => {
-        if (!this.active || !this.soundsOn) return;
-        const target = event.target as HTMLElement | null;
-        if (!target?.closest(".cm-editor")) return;
-        this.sounds.handleKey(event);
+        if (!inEditor(event)) return;
+        if (hemingway() && (event.key === "Backspace" || event.key === "Delete")) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (this.soundsOn) this.sounds.handleKey(event);
+      },
+      { capture: true }
+    );
+
+    // Hemingway mode, continued: block deletions that don't come from a key
+    // press (mobile keyboards) and cutting text out.
+    this.registerDomEvent(
+      document,
+      "beforeinput",
+      (event) => {
+        if (hemingway() && inEditor(event) && event.inputType.startsWith("delete")) {
+          event.preventDefault();
+        }
+      },
+      { capture: true }
+    );
+    this.registerDomEvent(
+      document,
+      "cut",
+      (event) => {
+        if (hemingway() && inEditor(event)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
       },
       { capture: true }
     );
@@ -110,6 +146,15 @@ export default class MonkModePlugin extends Plugin {
         if (!this.active) return false;
         if (!checking) this.toggleSounds();
         return true;
+      },
+    });
+    this.addCommand({
+      id: "toggle-hemingway-mode",
+      name: "Toggle Hemingway mode (no deleting)",
+      callback: async () => {
+        this.settings.hemingwayMode = !this.settings.hemingwayMode;
+        await this.saveSettings();
+        new Notice(`Hemingway mode ${this.settings.hemingwayMode ? "on" : "off"}`);
       },
     });
     this.addCommand({
@@ -348,10 +393,12 @@ export default class MonkModePlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.sounds.setVolume(this.settings.volume / 100);
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
+    this.sounds.setVolume(this.settings.volume / 100);
     if (this.active) {
       this.applyClasses();
       this.renderFooter();
@@ -408,6 +455,26 @@ class MonkModeSettingTab extends PluginSettingTab {
       "Start with typewriter sounds on",
       "Play IBM Selectric II sounds as you type. Off by default; the footer button turns them on for the current session.",
       "typewriterSounds"
+    );
+
+    new Setting(containerEl)
+      .setName("Typewriter volume")
+      .setDesc("How loud the typewriter sounds are.")
+      .addSlider((s) =>
+        s
+          .setLimits(0, 100, 5)
+          .setValue(this.plugin.settings.volume)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.volume = v;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    toggle(
+      "Hemingway mode",
+      "No deleting in Monk Mode: Backspace, Delete and Cut do nothing, so you can only write forward. Fix it in the edit.",
+      "hemingwayMode"
     );
 
     new Setting(containerEl)

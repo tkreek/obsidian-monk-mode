@@ -27,7 +27,7 @@ const SOURCES: Record<Kind, Uint8Array[]> = {
  * sounds looped. Audio is only set up the first time sounds are switched on.
  */
 export class TypewriterSounds {
-  volume = 0.35;
+  private volume = 0.35;
   private ctx: AudioContext | null = null;
   private gain: GainNode | null = null;
   private buffers: Partial<Record<Kind, AudioBuffer[]>> = {};
@@ -50,6 +50,12 @@ export class TypewriterSounds {
         )
       );
     }
+  }
+
+  /** Volume from 0 to 1. Applies immediately, even to sounds already playing. */
+  setVolume(volume: number) {
+    this.volume = Math.max(0, Math.min(1, volume));
+    if (this.gain) this.gain.gain.value = this.volume;
   }
 
   /** Call when sounds are switched on, so the first key press isn't silent. */
