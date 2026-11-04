@@ -25,21 +25,39 @@ body.monk-mode-active.monk-hide-other-panes .workspace-split.mod-root .workspace
   display: none;
 }
 
-/* Note header: hide breadcrumbs and buttons, keep a faint floating toggle */
+/* Note header: becomes a thin transparent strip across the top showing only
+   the note's name, small and muted, plus a faint Monk Mode toggle on the right. */
 body.monk-mode-active.monk-hide-view-header .workspace-leaf-content .view-header {
+  display: flex;
   position: absolute;
   top: 0;
+  left: 0;
   right: 0;
-  left: auto;
-  width: auto;
   background: transparent;
   border: none;
   z-index: var(--layer-cover, 5);
 }
 
 body.monk-mode-active.monk-hide-view-header .view-header-left,
-body.monk-mode-active.monk-hide-view-header .view-header-title-container,
+body.monk-mode-active.monk-hide-view-header .view-header-breadcrumb,
+body.monk-mode-active.monk-hide-view-header .view-header-breadcrumb-separator,
 body.monk-mode-active.monk-hide-view-header .view-actions > :not(.monk-mode-action) {
+  display: none;
+}
+
+body.monk-mode-active.monk-hide-view-header .view-header-title-container {
+  flex: 1;
+  justify-content: center;
+}
+
+body.monk-mode-active.monk-hide-view-header .view-header-title {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+/* The big title inside the note is replaced by the small one at the top. */
+body.monk-mode-active.monk-hide-view-header .inline-title {
   display: none;
 }
 
@@ -49,6 +67,18 @@ body.monk-mode-active.monk-hide-view-header .monk-mode-action {
 }
 
 body.monk-mode-active.monk-hide-view-header .monk-mode-action:hover {
+  opacity: 1;
+}
+
+/* Properties: smaller and faded until you hover over or edit them. */
+body.monk-mode-active .metadata-container {
+  font-size: var(--font-ui-smaller);
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+}
+
+body.monk-mode-active .metadata-container:hover,
+body.monk-mode-active .metadata-container:focus-within {
   opacity: 1;
 }
 

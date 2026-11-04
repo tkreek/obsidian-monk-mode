@@ -51,12 +51,14 @@ export default class MonkModePlugin extends Plugin {
     workspace.onLayoutReady(() => this.addHeaderButtons());
     this.registerEvent(workspace.on("layout-change", () => this.addHeaderButtons()));
 
-    // Keep properties collapsed as you move between notes while in Monk Mode.
-    const recollapse = () => {
-      if (this.active && this.settings.collapseProperties) this.collapsePropertiesSoon();
-    };
-    this.registerEvent(workspace.on("file-open", recollapse));
-    this.registerEvent(workspace.on("active-leaf-change", recollapse));
+    // As you move between notes in Monk Mode: keep properties folded and put
+    // the cursor in the body of the note.
+    this.registerEvent(workspace.on("file-open", () => {
+      if (this.active) this.settleSoon(true);
+    }));
+    this.registerEvent(workspace.on("active-leaf-change", () => {
+      if (this.active) this.settleSoon(false);
+    }));
 
     this.addCommand({
       id: "toggle",
@@ -89,7 +91,7 @@ export default class MonkModePlugin extends Plugin {
     }
     this.active = true;
     this.applyClasses();
-    if (this.settings.collapseProperties) this.collapsePropertiesSoon();
+    this.settleSoon(true);
     this.refreshButtons();
   }
 
@@ -115,9 +117,28 @@ export default class MonkModePlugin extends Plugin {
     document.body.style.setProperty("--monk-top-space", `${this.settings.topSpace}vh`);
   }
 
-  // The properties panel renders a moment after a note opens, so wait a frame.
-  private collapsePropertiesSoon() {
-    window.setTimeout(() => this.collapseProperties(), 50);
+  // The properties panel renders a moment after a note opens, so wait briefly
+  // before folding it and placing the cursor.
+  private settleSoon(focusBody: boolean) {
+    window.setTimeout(() => {
+      if (!this.active) return;
+      if (this.settings.collapseProperties) this.collapseProperties();
+      if (focusBody) this.focusBody();
+    }, 50);
+  }
+
+  // Focus the editor with the cursor in the note's text, below the properties.
+  // If the cursor is already in the text (e.g. restored from last time), keep it.
+  private focusBody() {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || view.getMode() !== "source" || !view.file) return;
+    const editor = view.editor;
+    const fm = this.app.metadataCache.getFileCache(view.file)?.frontmatterPosition;
+    const bodyStart = fm ? Math.min(fm.end.line + 1, editor.lastLine()) : 0;
+    if (editor.getCursor().line < bodyStart) {
+      editor.setCursor({ line: bodyStart, ch: 0 });
+    }
+    editor.focus();
   }
 
   private collapseProperties() {
@@ -207,7 +228,7 @@ class MonkModeSettingTab extends PluginSettingTab {
     toggle("Hide ribbon", "Hide the left ribbon.", "hideRibbon");
     toggle("Hide tab bar", "Hide the tabs and title bar.", "hideTabBar");
     toggle("Hide other panes", "Show only the active pane when the editor is split.", "hideOtherPanes");
-    toggle("Hide note header", "Hide the breadcrumbs and header buttons, leaving only a faint Monk Mode toggle.", "hideViewHeader");
+    toggle("Hide note header", "Replace the header and big title with a small, faded note name at the top and a faint Monk Mode toggle.", "hideViewHeader");
     toggle("Hide status bar", "Hide the bottom status bar.", "hideStatusBar");
     toggle("Collapse properties", "Fold the properties panel of each note you open.", "collapseProperties");
 
