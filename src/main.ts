@@ -10,7 +10,7 @@ interface MonkModeSettings {
   hideViewHeader: boolean;
   collapseProperties: boolean;
   showFooter: boolean;
-  typewriterSounds: boolean;
+  typewriterSounds: boolean; // start each Monk Mode session with sounds on
   topSpace: number; // empty space above the note, in % of window height
 }
 
@@ -49,6 +49,9 @@ export default class MonkModePlugin extends Plugin {
   private propertiesOpen = false;
 
   private sounds = new TypewriterSounds();
+  // Sounds for this session. The footer button changes this but doesn't save
+  // it, so every session starts from the "Typewriter sounds" setting (off).
+  private soundsOn = false;
   private footerEl: HTMLElement | null = null;
   private wordCountEl: HTMLElement | null = null;
   private propertiesButton: HTMLElement | null = null;
@@ -87,7 +90,7 @@ export default class MonkModePlugin extends Plugin {
       document,
       "keydown",
       (event) => {
-        if (!this.active || !this.settings.typewriterSounds) return;
+        if (!this.active || !this.soundsOn) return;
         const target = event.target as HTMLElement | null;
         if (!target?.closest(".cm-editor")) return;
         this.sounds.handleKey(event);
@@ -103,7 +106,11 @@ export default class MonkModePlugin extends Plugin {
     this.addCommand({
       id: "toggle-typewriter-sounds",
       name: "Toggle typewriter sounds",
-      callback: () => this.toggleSounds(),
+      checkCallback: (checking) => {
+        if (!this.active) return false;
+        if (!checking) this.toggleSounds();
+        return true;
+      },
     });
     this.addCommand({
       id: "toggle-properties",
@@ -144,7 +151,8 @@ export default class MonkModePlugin extends Plugin {
     this.applyClasses();
     this.renderFooter();
     this.applyPropertiesState();
-    if (this.settings.typewriterSounds) this.sounds.warmUp();
+    this.soundsOn = this.settings.typewriterSounds;
+    if (this.soundsOn) this.sounds.warmUp();
     this.settleSoon(true);
     this.refreshButtons();
   }
@@ -233,10 +241,9 @@ export default class MonkModePlugin extends Plugin {
 
   // ---------- Typewriter sounds ----------
 
-  async toggleSounds() {
-    this.settings.typewriterSounds = !this.settings.typewriterSounds;
-    if (this.settings.typewriterSounds) this.sounds.warmUp();
-    await this.saveData(this.settings);
+  toggleSounds() {
+    this.soundsOn = !this.soundsOn;
+    if (this.soundsOn) this.sounds.warmUp();
     this.refreshFooter();
   }
 
@@ -253,7 +260,7 @@ export default class MonkModePlugin extends Plugin {
     this.propertiesButton.addEventListener("click", () => this.toggleProperties());
 
     this.soundButton = left.createDiv({ cls: "clickable-icon monk-footer-button" });
-    this.soundButton.addEventListener("click", () => void this.toggleSounds());
+    this.soundButton.addEventListener("click", () => this.toggleSounds());
 
     this.wordCountEl = footer.createDiv({ cls: "monk-footer-words" });
 
@@ -277,7 +284,7 @@ export default class MonkModePlugin extends Plugin {
       this.propertiesButton.toggleClass("is-active", this.propertiesOpen);
     }
     if (this.soundButton) {
-      const on = this.settings.typewriterSounds;
+      const on = this.soundsOn;
       setIcon(this.soundButton, on ? "volume-2" : "volume-x");
       this.soundButton.setAttr("aria-label", on ? "Turn typewriter sounds off" : "Turn typewriter sounds on");
       this.soundButton.toggleClass("is-active", on);
@@ -397,7 +404,11 @@ class MonkModeSettingTab extends PluginSettingTab {
       "Show the word count and the properties and typewriter-sound buttons along the bottom.",
       "showFooter"
     );
-    toggle("Typewriter sounds", "Play IBM Selectric II sounds as you type in Monk Mode.", "typewriterSounds");
+    toggle(
+      "Start with typewriter sounds on",
+      "Play IBM Selectric II sounds as you type. Off by default; the footer button turns them on for the current session.",
+      "typewriterSounds"
+    );
 
     new Setting(containerEl)
       .setName("Space above note")
