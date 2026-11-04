@@ -1,15 +1,15 @@
-import key1 from "../sounds/key1.wav";
-import key2 from "../sounds/key2.wav";
-import key3 from "../sounds/key3.wav";
-import key4 from "../sounds/key4.wav";
-import key5 from "../sounds/key5.wav";
-import key6 from "../sounds/key6.wav";
-import key7 from "../sounds/key7.wav";
-import key8 from "../sounds/key8.wav";
-import space1 from "../sounds/space1.wav";
-import space2 from "../sounds/space2.wav";
-import backspace from "../sounds/backspace.wav";
-import carriageReturn from "../sounds/return.wav";
+import key1 from "../sounds/key1.mp3";
+import key2 from "../sounds/key2.mp3";
+import key3 from "../sounds/key3.mp3";
+import key4 from "../sounds/key4.mp3";
+import key5 from "../sounds/key5.mp3";
+import key6 from "../sounds/key6.mp3";
+import key7 from "../sounds/key7.mp3";
+import key8 from "../sounds/key8.mp3";
+import space1 from "../sounds/space1.mp3";
+import space2 from "../sounds/space2.mp3";
+import backspace from "../sounds/backspace.mp3";
+import carriageReturn from "../sounds/return.mp3";
 
 type Kind = "keys" | "spaces" | "backspaces" | "returns";
 

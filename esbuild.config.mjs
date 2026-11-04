@@ -8,7 +8,7 @@ const context = await esbuild.context({
   entryPoints: ["src/main.ts"],
   bundle: true,
   // Bundle the typewriter sounds into main.js (plugins ship only main.js).
-  loader: { ".wav": "binary" },
+  loader: { ".mp3": "binary" },
   external: [
     "obsidian",
     "electron",
