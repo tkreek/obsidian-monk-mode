@@ -132,7 +132,15 @@ body.monk-mode-active .workspace-leaf-content .markdown-reading-view .markdown-p
   color: var(--text-muted);
 }
 
-/* Properties switched off with the footer button: hide the whole panel. */
+/* Properties switched off with the footer button: hide the whole panel.
+   Obsidian shows it with a very specific rule
+   (.markdown-source-view.is-live-preview.show-properties .metadata-container:not(.mod-error)),
+   so turn off its own display variables and back that up with !important. */
+body.monk-mode-active.monk-hide-properties {
+  --metadata-display-editing: none;
+  --metadata-display-reading: none;
+}
+
 body.monk-mode-active.monk-hide-properties .metadata-container {
-  display: none;
+  display: none !important;
 }
