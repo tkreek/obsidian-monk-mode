@@ -60,6 +60,7 @@ export default class MonkModePlugin extends Plugin {
   private wordCountEl: HTMLElement | null = null;
   private propertiesButton: HTMLElement | null = null;
   private soundButton: HTMLElement | null = null;
+  private hemingwayButton: HTMLElement | null = null;
   private wordCountTimer: number | null = null;
 
   async onload() {
@@ -151,11 +152,7 @@ export default class MonkModePlugin extends Plugin {
     this.addCommand({
       id: "toggle-hemingway-mode",
       name: "Toggle Hemingway mode (no deleting)",
-      callback: async () => {
-        this.settings.hemingwayMode = !this.settings.hemingwayMode;
-        await this.saveSettings();
-        new Notice(`Hemingway mode ${this.settings.hemingwayMode ? "on" : "off"}`);
-      },
+      callback: () => this.toggleHemingway(true),
     });
     this.addCommand({
       id: "toggle-properties",
@@ -292,6 +289,15 @@ export default class MonkModePlugin extends Plugin {
     this.refreshFooter();
   }
 
+  // ---------- Hemingway mode ----------
+
+  async toggleHemingway(notify = false) {
+    this.settings.hemingwayMode = !this.settings.hemingwayMode;
+    await this.saveData(this.settings);
+    this.refreshFooter();
+    if (notify) new Notice(`Hemingway mode ${this.settings.hemingwayMode ? "on" : "off"}`);
+  }
+
   // ---------- Footer ----------
 
   private renderFooter() {
@@ -307,6 +313,9 @@ export default class MonkModePlugin extends Plugin {
     this.soundButton = left.createDiv({ cls: "clickable-icon monk-footer-button" });
     this.soundButton.addEventListener("click", () => this.toggleSounds());
 
+    this.hemingwayButton = left.createDiv({ cls: "clickable-icon monk-footer-button" });
+    this.hemingwayButton.addEventListener("click", () => void this.toggleHemingway());
+
     this.wordCountEl = footer.createDiv({ cls: "monk-footer-words" });
 
     // Keep the cursor in the note when clicking the footer buttons.
@@ -319,7 +328,7 @@ export default class MonkModePlugin extends Plugin {
 
   private removeFooter() {
     this.footerEl?.remove();
-    this.footerEl = this.wordCountEl = this.propertiesButton = this.soundButton = null;
+    this.footerEl = this.wordCountEl = this.propertiesButton = this.soundButton = this.hemingwayButton = null;
   }
 
   private refreshFooter() {
@@ -333,6 +342,15 @@ export default class MonkModePlugin extends Plugin {
       setIcon(this.soundButton, on ? "volume-2" : "volume-x");
       this.soundButton.setAttr("aria-label", on ? "Turn typewriter sounds off" : "Turn typewriter sounds on");
       this.soundButton.toggleClass("is-active", on);
+    }
+    if (this.hemingwayButton) {
+      const on = this.settings.hemingwayMode;
+      setIcon(this.hemingwayButton, "feather");
+      this.hemingwayButton.setAttr(
+        "aria-label",
+        on ? "Hemingway mode on: no deleting. Click to turn off" : "Turn on Hemingway mode (no deleting)"
+      );
+      this.hemingwayButton.toggleClass("is-active", on);
     }
   }
 

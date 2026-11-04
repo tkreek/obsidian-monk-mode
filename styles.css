@@ -141,8 +141,10 @@ body {
   padding: var(--size-2-2, 4px) 0;
 }
 
+/* Buttons that are switched on are brighter than ones that are off. The
+   properties and Hemingway icons don't change shape, so this is their cue. */
 .monk-footer-button.is-active {
-  color: var(--text-muted);
+  color: var(--text-normal);
 }
 
 /* Properties switched off with the footer button: hide the whole panel.
